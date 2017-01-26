@@ -4,11 +4,11 @@ library(tensorflow)
 # library(titanic)
 
 
-W <- tf$Variable(tf$zeros(c(5L,1L)), name='weights')
-b <- tf$Variable(0.0, name='bias')
+W <- tf$Variable(tf$zeros(c(4,1)), name='weights', dtype = tf$float32)
+b <- tf$Variable(0.0, name='bias',  dtype = tf$float32)
 
 combine_inputs <- function(X){
-  return(tf$matmul(X, W) + b)
+  return(tf$matmul(tf$cast(X, tf$float32), W) + b)
 }
 
 
@@ -17,7 +17,7 @@ inference <- function(X){
 }
 
 loss <- function(X,Y){
-  return(tf$reduce_mean(tf$nn$sigmoid_cross_entropy_with_logits(combine_inputs(X), Y)))
+  return(tf$reduce_mean(tf$nn$sigmoid_cross_entropy_with_logits(combine_inputs(X), tf$cast(Y, tf$float32))))
 }
 
 
@@ -41,28 +41,36 @@ read_csv <- function(batch_size, file_name, record_defaults){
 
 
 inputs <- function(){
-  batch_records <- read_csv(100L, "titanic.csv",list(tf$constant(0.0,shape=c),list(0.0),list(0L),list(""),list(""),list(0.0),list(0.0),list(0.0),
-                                    list(""),list(0.0),list(""),list("")))
-  # convert categorical data
-  is_first_class <- tf$to_float(tf$equal(batch_records[[3]], c(1L)))
-  is_second_class<- tf$to_float(tf$equal(batch_records[[3]], c(2L)))
-  is_third_class <- tf$to_float(tf$equal(batch_records[[3]], c(3L)))
-  
-  gender <- tf$to_float(tf$equal(batch_records[[5]], c("female")))
-  
-  age <- batch_records[[6]]
-  survived <- batch_records[[2]]
-  # Finally we pack all the features in a single matrix;
-  # We then transpose to have a matrix with one example per row and one feature per column.
-  features <- tf$transpose(tf$pack(list(is_first_class, is_second_class, is_third_class, gender, age)))
-  survived <- tf$reshape(survived, c(100L, 1L))
-  return(list(features=features, survived=survived))
+  #install.packages('titanic')
+  titanic <- na.omit(titanic::titanic_train)
+  x_mtrx <- model.matrix(~ factor(Pclass) + factor(Sex) + Age , data=titanic)[,-1]
+  y_mtrx <- as.matrix(titanic[,"Survived"])
+  # 
+  # batch_records <- read_csv(100L, "titanic.csv",list(tf$constant(list(0)), tf$constant(list(0)), tf$constant(list(0L)), 
+  #      tf$constant(list("")),  tf$constant(list("")), tf$constant(list(0.0)),tf$constant(list(0L)),tf$constant(list(0)), 
+  #      tf$constant(list("")), tf$constant(list(0.0)), tf$constant(list("")), tf$constant(list(""))))
+  # # convert categorical data
+  # is_first_class <- tf$to_float(tf$equal(batch_records[[3]], c(1L)))
+  # is_second_class<- tf$to_float(tf$equal(batch_records[[3]], c(2L)))
+  # is_third_class <- tf$to_float(tf$equal(batch_records[[3]], c(3L)))
+  # 
+  # gender <- tf$to_float(tf$equal(batch_records[[5]], c("female")))
+  # 
+  # age <- batch_records[[6]] 
+  # survived <- batch_records[[2]]
+  # # Finally we pack all the features in a single matrix;
+  # # We then transpose to have a matrix with one example per row and one feature per column.
+  # features <- tf$transpose(tf$pack(list(is_first_class, is_second_class, is_third_class, gender, age)))
+  # 
+  # survived <- tf$reshape(survived, shape = c(100L, 1L))
+  # #tf$Print(survived)
+  return(list(features=x_mtrx, survived=y_mtrx))
 }
 
 
 
 train <- function(total_loss){
-  learning_rate <- 0.01
+  learning_rate <- 0.001
   return(tf$train$GradientDescentOptimizer(learning_rate)$minimize(total_loss))
 }
 
@@ -91,9 +99,9 @@ with(tf$Session() %as% sess, {
     sess$run(train_op)
     # for debugging and learning purposes, see how the loss gets decremented thru training steps
     if(step %% 10 == 0){
-      print(sprint("loss : %f", sess$run(total_loss)))
+      print(sprintf("loss : %f", sess$run(total_loss)))
     }
-    evaluate(sess, X, Y)
+    evaluate(sess, X_Y$features, X_Y$survived)
     Sys.sleep(0.5)
     coord$request_stop()
     coord$join(threads)
