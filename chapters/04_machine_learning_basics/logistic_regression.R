@@ -108,3 +108,7 @@ with(tf$Session() %as% sess, {
     #sess.close()
   }
 })
+
+
+
+
