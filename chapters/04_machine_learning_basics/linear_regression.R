@@ -7,12 +7,17 @@ inference <- function(X){
   return(tf$matmul(tf$cast(X, tf$float32), W) + b)
 }
 
+reg_lambda <- 0.01
 
-loss <- function(X, Y){
+loss <- function(X, Y, x_tr_size){
   Y_predicted <- inference(X)
-  return(tf$reduce_sum(tf$squared_difference(Y, Y_predicted)))
+  loss <- tf$div(
+    #lasso
+    tf$reduce_sum(tf$square(Y - Y_predicted)) + reg_lambda * tf$reduce_sum(tf$square(W)), 
+                 2*x_tr_size)
+  
+  return(loss)
 }
-
 
 #http://people.sc.fsu.edu/~jburkardt/datasets/regression/x09.txt
 data <- 
@@ -69,7 +74,7 @@ with(tf$Session() %as% sess, {
   
   X_Y <- inputs()
   
-  total_loss <- loss(X_Y[[1]], X_Y[[2]])
+  total_loss <- loss(X_Y[[1]], X_Y[[2]], X_Y[[1]]$get_shape()$as_list()[[1]] )
   train_op <- train(total_loss)
   
   coord <- tf$train$Coordinator()
